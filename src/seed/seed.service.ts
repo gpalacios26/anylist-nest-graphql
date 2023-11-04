@@ -6,7 +6,11 @@ import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
 import { Item } from 'src/items/entities/item.entity';
 import { ItemsService } from 'src/items/items.service';
-import { SEED_ITEMS, SEED_USERS } from './data/seed-data';
+import { List } from 'src/lists/entities/list.entity';
+import { ListsService } from 'src/lists/lists.service';
+import { ListItem } from 'src/list-item/entities/list-item.entity';
+import { ListItemService } from 'src/list-item/list-item.service';
+import { SEED_ITEMS, SEED_LISTS, SEED_USERS } from './data/seed-data';
 
 @Injectable()
 export class SeedService {
@@ -15,12 +19,18 @@ export class SeedService {
 
     constructor(
         private readonly configService: ConfigService,
-        @InjectRepository(Item)
-        private readonly itemsRepository: Repository<Item>,
         @InjectRepository(User)
         private readonly usersRepository: Repository<User>,
+        @InjectRepository(Item)
+        private readonly itemsRepository: Repository<Item>,
+        @InjectRepository(List)
+        private readonly listsRepository: Repository<List>,
+        @InjectRepository(ListItem)
+        private readonly listItemsRepository: Repository<ListItem>,
         private readonly usersService: UsersService,
         private readonly itemsService: ItemsService,
+        private readonly listsService: ListsService,
+        private readonly listItemService: ListItemService,
     ) {
         this.isProd = configService.get('STATE') === 'prod';
     }
@@ -33,23 +43,42 @@ export class SeedService {
         // Borrar la información de prueba
         await this.deleteDatabase();
 
-        // Crear usuarios de prueba
+        // Crear Users
         const user = await this.loadUsers();
 
-        // Crear items de prueba
+        // Crear Items
         await this.loadItems(user);
+
+        // Crear Lists
+        const list = await this.loadLists(user);
+
+        // Crear ListItems
+        const items = await this.itemsService.findAll(user, { limit: 15, offset: 0 }, {});
+        await this.loadListItems(list, items);
 
         return true;
     }
 
     async deleteDatabase() {
-        // Borrar items
+        // Borrar ListItems
+        await this.listItemsRepository.createQueryBuilder()
+            .delete()
+            .where({})
+            .execute();
+
+        // Borrar Lists
+        await this.listsRepository.createQueryBuilder()
+            .delete()
+            .where({})
+            .execute();
+
+        // Borrar Items
         await this.itemsRepository.createQueryBuilder()
             .delete()
             .where({})
             .execute();
 
-        // Borrar users
+        // Borrar Users
         await this.usersRepository.createQueryBuilder()
             .delete()
             .where({})
@@ -70,5 +99,24 @@ export class SeedService {
             itemsPromises.push(this.itemsService.create(item, user));
         }
         await Promise.all(itemsPromises);
+    }
+
+    async loadLists(user: User): Promise<List> {
+        const lists = [];
+        for (const list of SEED_LISTS) {
+            lists.push(await this.listsService.create(list, user))
+        }
+        return lists[0];
+    }
+
+    async loadListItems(list: List, items: Item[]) {
+        for (const item of items) {
+            this.listItemService.create({
+                quantity: Math.round(Math.random() * 10),
+                completed: Math.round(Math.random() * 1) === 0 ? false : true,
+                listId: list.id,
+                itemId: item.id
+            });
+        }
     }
 }

@@ -2,8 +2,10 @@ import { Resolver, Query, Mutation, Args, ID, ResolveField, Int, Parent } from '
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ItemsService } from 'src/items/items.service';
+import { ListsService } from 'src/lists/lists.service';
 import { User } from './entities/user.entity';
 import { Item } from 'src/items/entities/item.entity';
+import { List } from 'src/lists/entities/list.entity';
 import { UpdateUserInput, ValidRolesArgs } from './dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -15,7 +17,8 @@ import { PaginationArgs, SearchArgs } from 'src/common/dto';
 export class UsersResolver {
   constructor(
     private readonly usersService: UsersService,
-    private readonly itemsService: ItemsService
+    private readonly itemsService: ItemsService,
+    private readonly listsService: ListsService
   ) { }
 
   @Query(() => [User], { name: 'users' })
@@ -66,5 +69,23 @@ export class UsersResolver {
     @Args() searchArgs: SearchArgs,
   ): Promise<Item[]> {
     return this.itemsService.findAll(parentUser, paginationArgs, searchArgs);
+  }
+
+  @ResolveField(() => Int, { name: 'listCount' })
+  async listCount(
+    @CurrentUser([ValidRoles.admin]) user: User,
+    @Parent() parentUser: User
+  ): Promise<number> {
+    return this.listsService.listCountByUser(parentUser);
+  }
+
+  @ResolveField(() => [List], { name: 'lists' })
+  async getListsByUser(
+    @CurrentUser([ValidRoles.admin]) user: User,
+    @Parent() parentUser: User,
+    @Args() paginationArgs: PaginationArgs,
+    @Args() searchArgs: SearchArgs,
+  ): Promise<List[]> {
+    return this.listsService.findAll(parentUser, paginationArgs, searchArgs);
   }
 }
